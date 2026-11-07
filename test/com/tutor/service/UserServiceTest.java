@@ -15,6 +15,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+/**
+ * 用户服务的单元测试：注册查重、登录的各条失败分支。
+ *
+ * @author 吴金洋
+ */
 @DisplayName("用户服务：注册查重与登录")
 class UserServiceTest extends ServiceTestBase
 {
@@ -59,6 +64,15 @@ class UserServiceTest extends ServiceTestBase
     }
 
     @Test
+    @DisplayName("用户名或密码为空，注册时直接拦下")
+    void registerBlankUsernameThrows()
+    {
+        BizException ex = assertThrows(BizException.class, () ->
+                userService.registerStudent("   ", "123456", "张三", "13800000001", "高一"));
+        assertTrue(ex.getMessage().contains("用户名"));
+    }
+
+    @Test
     @DisplayName("正确账号密码登录，返回同一个用户")
     void loginSuccess()
     {
@@ -73,7 +87,8 @@ class UserServiceTest extends ServiceTestBase
     @DisplayName("用户名不存在，登录抛业务异常")
     void loginUserNotFoundThrows()
     {
-        assertThrows(BizException.class, () -> userService.login("nobody", "123456"));
+        BizException ex = assertThrows(BizException.class, () -> userService.login("nobody", "123456"));
+        assertTrue(ex.getMessage().contains("不存在"));
     }
 
     @Test
@@ -82,6 +97,20 @@ class UserServiceTest extends ServiceTestBase
     {
         userService.registerStudent("stu1", "123456", "张三", "13800000001", "高一");
 
-        assertThrows(BizException.class, () -> userService.login("stu1", "wrong"));
+        BizException ex = assertThrows(BizException.class, () -> userService.login("stu1", "wrong"));
+        assertTrue(ex.getMessage().contains("密码"));
+    }
+
+    @Test
+    @DisplayName("账号被停用后登录，抛业务异常")
+    void loginDisabledAccountThrows()
+    {
+        Student student = userService.registerStudent("stu1", "123456", "张三",
+                "13800000001", "高一");
+        student.setEnabled(false);
+
+        BizException ex = assertThrows(BizException.class, () -> userService.login("stu1", "123456"));
+        assertTrue(ex.getMessage().contains("停用"));
+        assertEquals(1, dm.getStudents().size());
     }
 }

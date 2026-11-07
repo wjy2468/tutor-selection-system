@@ -24,7 +24,7 @@ public class Requirement implements Serializable
     public Requirement() {}
 
     public Requirement(Long id, Long studentId, Subject subject, String grade,
-                       String expectTime, String comment)
+                       String expectTime, String comment, NeedLevelEnum needLevel)
     {
         this.id = id;
         this.studentId = studentId;
@@ -32,6 +32,7 @@ public class Requirement implements Serializable
         this.grade = grade;
         this.expectTime = expectTime;
         this.comment = comment;
+        this.needLevel = needLevel;
     }
 
     public Long getId() { return id; }

@@ -1,7 +1,7 @@
 package com.tutor.ui;
 
 import com.tutor.common.BizException;
-import com.tutor.dao.DataManager;
+import com.tutor.common.NeedLevelEnum;
 import com.tutor.model.Invitation;
 import com.tutor.model.Match;
 import com.tutor.model.Requirement;
@@ -10,15 +10,13 @@ import com.tutor.service.InvitationService;
 import com.tutor.service.RequirementService;
 import java.awt.BorderLayout;
 import java.awt.FlowLayout;
-import java.awt.event.WindowAdapter;
-import java.awt.event.WindowEvent;
+import java.util.List;
 import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
-import java.util.List;
 
 /**
  * 教员端窗口。教员在这儿浏览全部学生需求、对看中的需求发起邀约。
@@ -28,6 +26,8 @@ import java.util.List;
  */
 public class TutorFrame extends JFrame
 {
+    private static final long serialVersionUID = 1L;
+
     private final Tutor tutor;
     private final RequirementService requirementService = new RequirementService();
     private final InvitationService invitationService = new InvitationService();
@@ -54,16 +54,6 @@ public class TutorFrame extends JFrame
         inviteButton.addActionListener(e -> onInvite());
         refreshButton.addActionListener(e -> refresh());
 
-        // 关窗前再存一次
-        addWindowListener(new WindowAdapter()
-        {
-            @Override
-            public void windowClosing(WindowEvent e)
-            {
-                DataManager.getInstance().save();
-            }
-        });
-
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setSize(720, 520);
         setLocationRelativeTo(null);
@@ -73,30 +63,44 @@ public class TutorFrame extends JFrame
     // 点发起邀约：先输需求 ID，再写留言，提交后等学生回复
     private void onInvite()
     {
-        String reqInput = JOptionPane.showInputDialog(this, "请输入要应聘的需求ID:");
-        if (reqInput == null || reqInput.trim().isEmpty())
+        Long requirementId = askId("请输入要应聘的需求ID:");
+        if (requirementId == null)
+        {
+            return;
+        }
+        String message = JOptionPane.showInputDialog(this, "请输入给学生的留言:");
+        if (message == null)
         {
             return;
         }
         try
         {
-            Long requirementId = Long.parseLong(reqInput.trim());
-            String message = JOptionPane.showInputDialog(this, "请输入给学生的留言:");
-            if (message == null)
-            {
-                return;
-            }
             invitationService.sendInvitation(tutor.getId(), requirementId, message);
             refresh();
             JOptionPane.showMessageDialog(this, "邀约已发起，等待学生回复");
         }
-        catch (NumberFormatException e)
-        {
-            JOptionPane.showMessageDialog(this, "ID 必须是数字");
-        }
         catch (BizException e)
         {
             JOptionPane.showMessageDialog(this, e.getMessage());
+        }
+    }
+
+    // 输入框里问一个 ID：取消或没填就返回 null，填的不是数字就提示一下
+    private Long askId(String prompt)
+    {
+        String input = JOptionPane.showInputDialog(this, prompt);
+        if (input == null || input.trim().isEmpty())
+        {
+            return null;
+        }
+        try
+        {
+            return Long.parseLong(input.trim());
+        }
+        catch (NumberFormatException e)
+        {
+            JOptionPane.showMessageDialog(this, "ID 必须是数字");
+            return null;
         }
     }
 
@@ -112,7 +116,7 @@ public class TutorFrame extends JFrame
                     .append(" 科目:").append(r.getSubject().getDisplayName())
                     .append(" 年级:").append(r.getGrade())
                     .append(" 时间:").append(r.getExpectTime())
-                    .append(" 层次:").append(r.getNeedLevel().getDisplayName())
+                    .append(" 层次:").append(describeLevel(r))
                     .append("\n 备注:").append(r.getComment()).append("\n");
         }
         sb.append("\n===== 我发起的邀约 =====\n");
@@ -136,5 +140,12 @@ public class TutorFrame extends JFrame
                     .append(" 科目:").append(m.getSubject().getDisplayName()).append("\n");
         }
         textArea.setText(sb.toString());
+    }
+
+    // 老数据里可能没填需求层次，显示成"未设置"就行，别让界面崩掉
+    private String describeLevel(Requirement requirement)
+    {
+        NeedLevelEnum level = requirement.getNeedLevel();
+        return level == null ? "未设置" : level.getDisplayName();
     }
 }

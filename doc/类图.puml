@@ -1,4 +1,4 @@
-@startuml 家教双选系统类图
+@startuml
 ' 家教双选系统 UML 类图，字段与方法均与当前源码一致
 skinparam classAttributeIconSize 0
 skinparam shadowing false
@@ -54,7 +54,7 @@ package "common 通用层" <<Folder>> {
         NORMAL
         ADVANCED
         --
-        + getMinTutorLevel(): int
+        + getMinLevel(): TutorLevelEnum
         + getDisplayName(): String
     }
 }
@@ -68,9 +68,9 @@ package "model 模型层" <<Folder>> {
         - password: String
         - realName: String
         - phone: String
-        - role: Role
         - enabled: boolean
         --
+        + {abstract} getRole(): Role
         + {abstract} getRoleName(): String
         + getters / setters
         + toString(): String
@@ -80,6 +80,7 @@ package "model 模型层" <<Folder>> {
         - grade: String
         --
         + Student(id, username, password, realName, phone, grade)
+        + getRole(): Role
         + getRoleName(): String
         + getGrade() / setGrade()
     }
@@ -90,8 +91,13 @@ package "model 模型层" <<Folder>> {
         - tutorLevel: TutorLevelEnum
         --
         + Tutor(id, username, password, realName, phone)
+        + Tutor(id, username, password, realName, phone, subjects, experience, tutorLevel)
+        + getRole(): Role
         + getRoleName(): String
-        + getters / setters
+        + hasSubject(subject): boolean
+        + meetsLevel(minLevel): boolean
+        + levelGap(minLevel): int
+        + getters / setters（subjects 只读视图）
     }
 
     class Requirement {
@@ -103,7 +109,7 @@ package "model 模型层" <<Folder>> {
         - comment: String
         - needLevel: NeedLevelEnum
         --
-        + Requirement(id, studentId, subject, grade, expectTime, comment)
+        + Requirement(id, studentId, subject, grade, expectTime, comment, needLevel)
         + getters / setters
     }
 
@@ -116,7 +122,9 @@ package "model 模型层" <<Folder>> {
         - status: InvitationStatus
         --
         + Invitation(id, tutorId, requirementId, studentId, message)
-        + getters / setters
+        + accept(): void
+        + reject(): void
+        + getters（status 只读）
     }
 
     class Match {
@@ -135,23 +143,23 @@ package "model 模型层" <<Folder>> {
 package "dao 数据层" <<Folder>> {
 
     class DataManager {
-        - {static} instance: DataManager
+        - {static} INSTANCE: DataManager
         - students: List<Student>
         - tutors: List<Tutor>
         - requirements: List<Requirement>
         - invitations: List<Invitation>
         - matches: List<Match>
-        - idGen: AtomicLong
+        - studentIdGen 等 5 个: AtomicLong
         --
         + {static} getInstance(): DataManager
         + load(): void
         + save(): void
-        + nextXxxId(): Long
-        + addXxx(entity): void
+        + addXxx(entity): entity
         + getXxx(): List (unmodifiable)
-        - loadList<T>(): List<T>
-        - saveList<T>(): void
-        - getMaxId(): long
+        + reset(): void
+        - {static} loadList<T>(file): List<T>
+        - {static} saveList<T>(file, list): void
+        - {static} maxId<T>(list, idGetter): long
     }
 }
 
@@ -174,12 +182,14 @@ package "service 业务层" <<Folder>> {
     }
 
     class InvitationService {
+        - requirementService: RequirementService
         + sendInvitation(tutorId, reqId, message): Invitation
         + accept(invitationId, studentId): Match
         + reject(invitationId, studentId): void
         + listByStudent(id): List<Invitation>
         + listByTutor(id): List<Invitation>
         + listMatches(userId): List<Match>
+        - checkOwner(invitation, studentId): void
     }
 }
 
@@ -245,6 +255,7 @@ DataManager o-- Match
 UserService ..> DataManager
 RequirementService ..> DataManager
 InvitationService ..> DataManager
+InvitationService ..> RequirementService
 LoginFrame ..> UserService
 StudentFrame ..> RequirementService
 StudentFrame ..> InvitationService

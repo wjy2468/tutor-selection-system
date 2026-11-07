@@ -17,9 +17,12 @@ public class Student extends User
 
     public Student(Long id, String username, String password, String realName, String phone, String grade)
     {
-        super(id, username, password, realName, phone, Role.STUDENT);
+        super(id, username, password, realName, phone);
         this.grade = grade;
     }
+
+    @Override
+    public Role getRole() { return Role.STUDENT; }
 
     @Override
     public String getRoleName() { return "学生"; }

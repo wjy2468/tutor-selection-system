@@ -10,13 +10,17 @@ import com.tutor.model.Student;
 import com.tutor.model.Tutor;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+/**
+ * 需求服务的单元测试：发布校验、按学生查询、以及推荐的硬筛与排序。
+ *
+ * @author 吴金洋
+ */
 @DisplayName("需求服务：发布查询与教员推荐")
 class RequirementServiceTest extends ServiceTestBase
 {
@@ -27,9 +31,8 @@ class RequirementServiceTest extends ServiceTestBase
     // 直接构造一个教员并入库，便于按不同科目、水平、启用状态搭场景
     private Tutor makeTutor(long id, Subject subject, TutorLevelEnum level, boolean enabled)
     {
-        Tutor tutor = new Tutor(id, "tut" + id, "123456", "老师" + id, "13800000000");
-        tutor.setSubjects(new ArrayList<>(Arrays.asList(subject)));
-        tutor.setTutorLevel(level);
+        Tutor tutor = new Tutor(id, "tut" + id, "123456", "老师" + id, "13800000000",
+                Arrays.asList(subject), "三年经验", level);
         tutor.setEnabled(enabled);
         dm.addTutor(tutor);
         return tutor;
@@ -46,6 +49,19 @@ class RequirementServiceTest extends ServiceTestBase
 
         assertEquals(NeedLevelEnum.NORMAL, requirement.getNeedLevel());
         assertEquals(1, dm.getRequirements().size());
+    }
+
+    @Test
+    @DisplayName("必填项缺失时发布失败，不会留下半条数据")
+    void publishMissingNeedLevelThrows()
+    {
+        Student student = userService.registerStudent("stu1", "123456", "张三",
+                "13800000001", "高一");
+
+        BizException ex = assertThrows(BizException.class, () ->
+                requirementService.publish(student.getId(), Subject.MATH, "高一", "周末", "备注", null));
+        assertTrue(ex.getMessage().contains("层次"));
+        assertEquals(0, dm.getRequirements().size());
     }
 
     @Test
@@ -89,12 +105,16 @@ class RequirementServiceTest extends ServiceTestBase
 
         List<Tutor> recommended = requirementService.recommendTutors(requirement.getId());
 
-        // 只有 fit、higher 通过硬筛
+        // 只有 fit、higher 通过硬筛，水平不够、科目不符、账号停用的都要挡在外面
         assertEquals(2, recommended.size());
         assertTrue(recommended.contains(fit));
         assertTrue(recommended.contains(higher));
         // 差距 0 的 fit 排在差距 1 的 higher 前面
         assertEquals(fit.getId(), recommended.get(0).getId());
         assertEquals(higher.getId(), recommended.get(1).getId());
+        // 顺便确认被筛掉的三个人确实没进来
+        assertTrue(!recommended.contains(tooLow));
+        assertTrue(!recommended.contains(wrongSubject));
+        assertTrue(!recommended.contains(disabled));
     }
 }
