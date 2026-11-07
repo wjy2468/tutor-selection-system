@@ -1,0 +1,260 @@
+@startuml 家教双选系统类图
+' 家教双选系统 UML 类图，字段与方法均与当前源码一致
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+skinparam linetype ortho
+skinparam defaultFontName Microsoft YaHei
+skinparam packageStyle rectangle
+hide empty members
+
+' ============ 通用层：枚举与异常 ============
+package "common 通用层" <<Folder>> {
+
+    class BizException {
+        + BizException(message: String)
+    }
+
+    enum Role {
+        STUDENT
+        TUTOR
+    }
+
+    enum Subject {
+        MATH
+        CHINESE
+        ENGLISH
+        PHYSICS
+        CHEMISTRY
+        OTHER
+        --
+        + getDisplayName(): String
+    }
+
+    enum InvitationStatus {
+        PENDING
+        ACCEPTED
+        REJECTED
+        --
+        + getDisplayName(): String
+        + isFinal(): boolean
+    }
+
+    enum TutorLevelEnum {
+        JUNIOR
+        STANDARD
+        SENIOR
+        TOP
+        --
+        + getLevel(): int
+        + getDisplayName(): String
+    }
+
+    enum NeedLevelEnum {
+        BASIC
+        NORMAL
+        ADVANCED
+        --
+        + getMinTutorLevel(): int
+        + getDisplayName(): String
+    }
+}
+
+' ============ 模型层：实体 ============
+package "model 模型层" <<Folder>> {
+
+    abstract class User {
+        - id: Long
+        - username: String
+        - password: String
+        - realName: String
+        - phone: String
+        - role: Role
+        - enabled: boolean
+        --
+        + {abstract} getRoleName(): String
+        + getters / setters
+        + toString(): String
+    }
+
+    class Student {
+        - grade: String
+        --
+        + Student(id, username, password, realName, phone, grade)
+        + getRoleName(): String
+        + getGrade() / setGrade()
+    }
+
+    class Tutor {
+        - subjects: List<Subject>
+        - experience: String
+        - tutorLevel: TutorLevelEnum
+        --
+        + Tutor(id, username, password, realName, phone)
+        + getRoleName(): String
+        + getters / setters
+    }
+
+    class Requirement {
+        - id: Long
+        - studentId: Long
+        - subject: Subject
+        - grade: String
+        - expectTime: String
+        - comment: String
+        - needLevel: NeedLevelEnum
+        --
+        + Requirement(id, studentId, subject, grade, expectTime, comment)
+        + getters / setters
+    }
+
+    class Invitation {
+        - id: Long
+        - tutorId: Long
+        - requirementId: Long
+        - studentId: Long
+        - message: String
+        - status: InvitationStatus
+        --
+        + Invitation(id, tutorId, requirementId, studentId, message)
+        + getters / setters
+    }
+
+    class Match {
+        - id: Long
+        - invitationId: Long
+        - studentId: Long
+        - tutorId: Long
+        - subject: Subject
+        --
+        + Match(id, invitationId, studentId, tutorId, subject)
+        + getters / setters
+    }
+}
+
+' ============ 数据层 ============
+package "dao 数据层" <<Folder>> {
+
+    class DataManager {
+        - {static} instance: DataManager
+        - students: List<Student>
+        - tutors: List<Tutor>
+        - requirements: List<Requirement>
+        - invitations: List<Invitation>
+        - matches: List<Match>
+        - idGen: AtomicLong
+        --
+        + {static} getInstance(): DataManager
+        + load(): void
+        + save(): void
+        + nextXxxId(): Long
+        + addXxx(entity): void
+        + getXxx(): List (unmodifiable)
+        - loadList<T>(): List<T>
+        - saveList<T>(): void
+        - getMaxId(): long
+    }
+}
+
+' ============ 业务层 ============
+package "service 业务层" <<Folder>> {
+
+    class UserService {
+        + login(username, password): User
+        + registerStudent(...): Student
+        + registerTutor(...): Tutor
+        - findByUsername(username): User
+    }
+
+    class RequirementService {
+        + publish(...): Requirement
+        + listAll(): List<Requirement>
+        + listByStudent(id): List<Requirement>
+        + getById(id): Requirement
+        + recommendTutors(id): List<Tutor>
+    }
+
+    class InvitationService {
+        + sendInvitation(tutorId, reqId, message): Invitation
+        + accept(invitationId, studentId): Match
+        + reject(invitationId, studentId): void
+        + listByStudent(id): List<Invitation>
+        + listByTutor(id): List<Invitation>
+        + listMatches(userId): List<Match>
+    }
+}
+
+' ============ 界面层 ============
+package "ui 界面层" <<Folder>> {
+
+    class Main {
+        + {static} main(args): void
+    }
+
+    class LoginFrame {
+        - userService: UserService
+        + onLogin(): void
+        + onRegisterStudent(): void
+        + onRegisterTutor(): void
+    }
+
+    class StudentFrame {
+        - student: Student
+        + onPublish(): void
+        + onRecommend(): void
+        + onAccept(): void
+        + onReject(): void
+        + refresh(): void
+    }
+
+    class TutorFrame {
+        - tutor: Tutor
+        + onInvite(): void
+        + refresh(): void
+    }
+}
+
+' ============ 继承关系 ============
+User <|-- Student
+User <|-- Tutor
+BizException --|> RuntimeException
+
+' ============ 模型之间的关联（字段引用） ============
+User --> Role
+Tutor --> Subject
+Tutor --> TutorLevelEnum
+Requirement --> Subject
+Requirement --> NeedLevelEnum
+Requirement ..> Student : studentId
+Invitation --> InvitationStatus
+Invitation ..> Tutor : tutorId
+Invitation ..> Requirement : requirementId
+Invitation ..> Student : studentId
+Match --> Subject
+Match ..> Invitation : invitationId
+Match ..> Student : studentId
+Match ..> Tutor : tutorId
+
+' ============ 数据层聚合持有实体 ============
+DataManager o-- Student
+DataManager o-- Tutor
+DataManager o-- Requirement
+DataManager o-- Invitation
+DataManager o-- Match
+
+' ============ 分层依赖 ============
+UserService ..> DataManager
+RequirementService ..> DataManager
+InvitationService ..> DataManager
+LoginFrame ..> UserService
+StudentFrame ..> RequirementService
+StudentFrame ..> InvitationService
+TutorFrame ..> InvitationService
+Main ..> LoginFrame
+
+note bottom of DataManager
+  集合以 unmodifiableList 对外，
+  外部只能通过 addXxx 新增，
+  避免内部可变集合被直接改写。
+end note
+
+@enduml
